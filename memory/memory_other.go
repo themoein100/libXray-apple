@@ -2,4 +2,5 @@
 
 package memory
 
-func InitForceFree() {}
+func SetMemoryLimitMB(mb int64) {}
+func InitForceFree()             {}

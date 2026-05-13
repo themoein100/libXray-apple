@@ -35,6 +35,16 @@ class Builder(object):
         if ret.returncode != 0:
             raise Exception("go mod init failed")
 
+        # Use local patched Xray-core if present alongside libXray
+        xray_core_path = os.path.join(os.path.dirname(os.path.abspath(self.lib_dir)), "Xray-core")
+        if os.path.isdir(xray_core_path):
+            ret = subprocess.run([
+                "go", "mod", "edit",
+                f"-replace=github.com/xtls/xray-core={xray_core_path}",
+            ])
+            if ret.returncode != 0:
+                raise Exception("go mod edit replace failed")
+
         ret = subprocess.run(
             [
                 "go",

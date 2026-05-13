@@ -28,6 +28,10 @@ func transportFieldsFromURLQuery(q url.Values) shareTransportFields {
 	if network == "" {
 		network = "raw"
 	}
+	extra := q.Get("extra")
+	if decoded, err := url.QueryUnescape(extra); err == nil {
+		extra = decoded
+	}
 	return shareTransportFields{
 		Network:         network,
 		HeaderType:      q.Get("headerType"),
@@ -38,7 +42,7 @@ func transportFieldsFromURLQuery(q url.Values) shareTransportFields {
 		GrpcServiceName: q.Get("serviceName"),
 		GrpcMultiMode:   q.Get("mode") == "multi",
 		XHTTPMode:       q.Get("mode"),
-		ExtraJSON:       q.Get("extra"),
+		ExtraJSON:       extra,
 		FMJSON:          q.Get("fm"),
 	}
 }

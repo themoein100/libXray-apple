@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 
 	"github.com/xtls/libxray/geo"
+	"github.com/xtls/libxray/memory"
 	"github.com/xtls/libxray/nodep"
 	"github.com/xtls/libxray/xray"
 )
@@ -14,6 +15,30 @@ import (
 // Call this BEFORE RunXray/RunXrayFromJSON.
 func SetTunFd(fd int32) {
 	xray.SetTunFd(fd)
+}
+
+// SetMemoryLimitMB sets the Go heap ceiling in megabytes.
+// Call this BEFORE RunXray/RunXrayFromJSON.
+func SetMemoryLimitMB(mb int64) {
+	memory.SetMemoryLimitMB(mb)
+}
+
+// SetTCPBufMaxKB sets the max TCP RX/TX buffer size per connection in kilobytes.
+// Call this BEFORE RunXray/RunXrayFromJSON.
+func SetTCPBufMaxKB(kb int32) {
+	xray.SetTCPBufMaxKB(int(kb))
+}
+
+// SetTCPMaxInFlight sets the max concurrent TCP connections.
+// Call this BEFORE RunXray/RunXrayFromJSON.
+func SetTCPMaxInFlight(n int32) {
+	xray.SetTCPMaxInFlight(int(n))
+}
+
+// SetMaxUDPConns sets the max concurrent UDP sessions.
+// Call this BEFORE RunXray/RunXrayFromJSON.
+func SetMaxUDPConns(n int32) {
+	xray.SetMaxUDPConns(int(n))
 }
 
 type CountGeoDataRequest struct {

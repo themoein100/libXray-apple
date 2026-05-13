@@ -359,6 +359,18 @@ func TestConvertShareLinksToXrayJson_TransportKcpGrpcHttpUpgradeXhttp(t *testing
 		assert.Equal(t, "stream-up", x.Mode)
 		require.NotNil(t, x.Extra)
 	})
+	t.Run("xhttp_extra_double_encoded", func(t *testing.T) {
+		// Some share link generators double-encode the extra JSON.
+		extra := `{"host":"xh.extra"}`
+		link := "vless://" + testShareUUID + "@xh.example:443?encryption=none&type=xhttp&path=%2Fx&host=xh.host&mode=stream-up&extra=" +
+			url.QueryEscape(url.QueryEscape(extra))
+		cfg, err := ConvertShareLinksToXrayJson(link)
+		require.NoError(t, err)
+		x := cfg.OutboundConfigs[0].StreamSetting.XHTTPSettings
+		require.NotNil(t, x)
+		assert.Equal(t, "stream-up", x.Mode)
+		require.NotNil(t, x.Extra)
+	})
 }
 
 func TestConvertShareLinksToXrayJson_FinalMaskQuery(t *testing.T) {
