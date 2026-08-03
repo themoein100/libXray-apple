@@ -6,15 +6,12 @@ import (
 	"strconv"
 
 	"github.com/xtls/libxray/memory"
-	"github.com/xtls/xray-core/app/router"
 	"github.com/xtls/xray-core/common/cmdarg"
 	"github.com/xtls/xray-core/common/platform"
 	"github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/infra/conf/serial"
 	"github.com/xtls/xray-core/main/commands/base"
 	_ "github.com/xtls/xray-core/main/distro/all"
-	"github.com/xtls/xray-core/proxy/tun"
-	xtls "github.com/xtls/xray-core/transport/internet/tls"
 )
 
 var (
@@ -55,23 +52,6 @@ func SetTunFd(fd int32) {
 	os.Setenv(platform.TunFdKey, strconv.Itoa(int(fd)))
 }
 
-// SetTCPBufMaxKB sets the max TCP RX/TX buffer size in kilobytes.
-// Call this BEFORE RunXray/RunXrayFromJSON.
-func SetTCPBufMaxKB(kb int) {
-	tun.SetTCPBufMaxKB(kb)
-}
-
-// SetTCPMaxInFlight sets the max concurrent TCP connections.
-// Call this BEFORE RunXray/RunXrayFromJSON.
-func SetTCPMaxInFlight(n int) {
-	tun.SetTCPMaxInFlight(n)
-}
-
-// SetMaxUDPConns sets the max concurrent UDP sessions.
-// Call this BEFORE RunXray/RunXrayFromJSON.
-func SetMaxUDPConns(n int) {
-	tun.SetMaxUDPConns(n)
-}
 
 func InitEnv(datDir string, mphCachePath string) {
 	os.Setenv(platform.AssetLocation, datDir)
@@ -131,8 +111,6 @@ func StopXray() error {
 		coreServer = nil
 	}
 	// Clear global caches that survive coreServer.Close().
-	router.ClearGeoIPCache()
-	xtls.ResetSessionCache()
 	debug.FreeOSMemory()
 	return err
 }

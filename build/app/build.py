@@ -30,10 +30,10 @@ class Builder(object):
 
     def init_go_env(self):
         os.chdir(self.lib_dir)
-        self.clean_lib_files(["go.mod", "go.sum"])
-        ret = subprocess.run(["go", "mod", "init", LIBXRAY_MOD_NAME])
-        if ret.returncode != 0:
-            raise Exception("go mod init failed")
+        # self.clean_lib_files(["go.mod", "go.sum"])
+        # ret = subprocess.run(["go", "mod", "init", LIBXRAY_MOD_NAME])
+        # if ret.returncode != 0:
+        #     raise Exception("go mod init failed")
 
         # Use local patched Xray-core if present alongside libXray
         xray_core_path = os.path.join(os.path.dirname(os.path.abspath(self.lib_dir)), "Xray-core")
@@ -160,10 +160,10 @@ class Builder(object):
 
     def revert_go_env(self):
         os.chdir(self.lib_dir)
-        self.clean_lib_files(["go.mod", "go.sum"])
-        ret = subprocess.run(["go", "mod", "init", LIBXRAY_MOD_NAME])
-        if ret.returncode != 0:
-            raise Exception("go mod init failed")
+        # self.clean_lib_files(["go.mod", "go.sum"])
+        # ret = subprocess.run(["go", "mod", "init", LIBXRAY_MOD_NAME])
+        # if ret.returncode != 0:
+        #     raise Exception("go mod init failed")
 
         ret = subprocess.run(
             [

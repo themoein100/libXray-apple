@@ -9,6 +9,11 @@ func CGoSetTunFd(fd C.int) {
 	SetTunFd(int32(fd))
 }
 
+//export CGoSetMemoryLimitMB
+func CGoSetMemoryLimitMB(mb C.longlong) {
+	SetMemoryLimitMB(int64(mb))
+}
+
 //export CGoInitDns
 func CGoInitDns(base64Text *C.char) *C.char {
 	text := C.GoString(base64Text)
