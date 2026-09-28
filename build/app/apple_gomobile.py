@@ -22,6 +22,12 @@ class AppleGoMobileBuilder(Builder):
                 "ios,iossimulator,macos,maccatalyst",
                 "-iosversion",
                 "15.0",
+                # Without this gomobile leaves the macOS deployment target to clang,
+                # which defaults to the build machine's OS, so the macOS slice would
+                # not load on anything older than the Mac that built it. 13.0 is the
+                # oldest macOS that Go 1.27 supports.
+                "-macosversion",
+                "13.0",
             ]
         )
         if ret.returncode != 0:
