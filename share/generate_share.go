@@ -245,13 +245,12 @@ func streamSettingsQuery(proxy conf.OutboundDetourConfig, link *url.URL) {
 			if len(qp.BrutalDown) > 0 {
 				query = addQuery(query, "down", string(qp.BrutalDown))
 			}
-			if qp.UdpHop.PortList != nil {
-				var portList string
-				if json.Unmarshal(qp.UdpHop.PortList, &portList) == nil && len(portList) > 0 {
-					query = addQuery(query, "ports", portList)
-				}
+			// Both fields are values (not pointers) since v26; an empty range and a
+			// zero interval stand in for what used to be nil.
+			if portList := qp.UdpHop.PortList.String(); len(portList) > 0 {
+				query = addQuery(query, "ports", portList)
 			}
-			if qp.UdpHop.Interval != nil {
+			if qp.UdpHop.Interval.From != 0 {
 				query = addQuery(query, "hop-interval", strconv.FormatInt(int64(qp.UdpHop.Interval.From), 10))
 			}
 		}

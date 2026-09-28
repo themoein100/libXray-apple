@@ -208,7 +208,8 @@ func (proxy ClashProxy) shadowsocksOutbound() (*conf.OutboundDetourConfig, error
 
 	settings.Cipher = proxy.Cipher
 	settings.Password = proxy.Password
-	settings.UoT = proxy.UdpOverTcp
+	// proxy.UdpOverTcp is dropped: v26 removed UoT from ShadowsocksClientConfig,
+	// so there is no longer a field to carry a Clash `udp-over-tcp` flag into.
 
 	settingsRawMessage, err := convertJsonToRawMessage(settings)
 	if err != nil {

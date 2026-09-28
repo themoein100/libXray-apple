@@ -10,7 +10,6 @@ import (
 	"github.com/xtls/xray-core/common/platform"
 	"github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/infra/conf/serial"
-	"github.com/xtls/xray-core/main/commands/base"
 	_ "github.com/xtls/xray-core/main/distro/all"
 )
 
@@ -53,13 +52,11 @@ func SetTunFd(fd int32) {
 }
 
 
+// mphCachePath is accepted for API compatibility only. Xray-core v26 removed the
+// MPH cache (and platform.MphCachePath with it); geo lookups no longer use one.
 func InitEnv(datDir string, mphCachePath string) {
 	os.Setenv(platform.AssetLocation, datDir)
 	os.Setenv(platform.CertLocation, datDir)
-
-	if mphCachePath != "" {
-		os.Setenv(platform.MphCachePath, mphCachePath)
-	}
 }
 
 // Run Xray instance.
@@ -120,23 +117,20 @@ func XrayVersion() string {
 	return core.Version()
 }
 
-// https://github.com/XTLS/Xray-core/blob/main/main/commands/all/buildmphcache.go
+// No-op since Xray-core v26, which removed the MPH cache along with the
+// buildmphcache command this mirrored. The function is kept so the gomobile
+// binding keeps exporting LibXrayBuildMphCache; callers still get a nil error
+// and simply have nothing to build. The config is still decoded so a malformed
+// config is reported here rather than silently accepted.
 func BuildMphCache(datDir string, mphCachePath string, configPath string) error {
 	InitEnv(datDir, "")
 	cf, err := os.Open(configPath)
 	if err != nil {
-		base.Fatalf("failed to open config file: %v", err)
+		return err
 	}
 	defer cf.Close()
 
-	config, err := serial.DecodeJSONConfig(cf)
-	if err != nil {
-		base.Fatalf("failed to decode config file: %v", err)
-		return err
-	}
-
-	if err := config.BuildMPHCache(&mphCachePath); err != nil {
-		base.Fatalf("failed to build MPH cache: %v", err)
+	if _, err := serial.DecodeJSONConfig(cf); err != nil {
 		return err
 	}
 	return nil

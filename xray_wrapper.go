@@ -23,6 +23,23 @@ func SetMemoryLimitMB(mb int64) {
 	memory.SetMemoryLimitMB(mb)
 }
 
+// FreeOSMemory forces a GC and returns all free Go heap pages to the OS.
+// Stops the world briefly; meant for memory emergencies, not the steady state.
+func FreeOSMemory() {
+	memory.FreeOSMemory()
+}
+
+// GoMemoryReport returns a one-line summary of the Go runtime's memory.
+func GoMemoryReport() string {
+	return memory.Report()
+}
+
+// GoroutineSummary groups live goroutines by where they are parked and returns
+// the largest groups. Takes a goroutine profile; emergency diagnostics only.
+func GoroutineSummary(top int) string {
+	return memory.GoroutineSummary(top)
+}
+
 type CountGeoDataRequest struct {
 	DatDir  string `json:"datDir,omitempty"`
 	Name    string `json:"name,omitempty"`
@@ -72,6 +89,23 @@ type pingRequest struct {
 	Proxy      string `json:"proxy,omitempty"`
 }
 
+type pingBatchItemRequest struct {
+	XrayJSON    string `json:"xrayJSON,omitempty"`
+	OutboundTag string `json:"outboundTag,omitempty"`
+}
+
+type pingBatchRequest struct {
+	Configs []pingBatchItemRequest `json:"configs,omitempty"`
+	Timeout int                    `json:"timeout,omitempty"`
+	URL     string                 `json:"url,omitempty"`
+}
+
+type pingBatchItemResponse struct {
+	Success bool   `json:"success"`
+	Delay   int64  `json:"delay"`
+	Error   string `json:"error,omitempty"`
+}
+
 // Ping Xray config and get the delay of its outbound.
 func Ping(base64Text string) string {
 	var response nodep.CallResponse[int64]
@@ -86,6 +120,43 @@ func Ping(base64Text string) string {
 	}
 	delay, err := xray.Ping(request.DatDir, request.ConfigPath, request.Timeout, request.Url, request.Proxy)
 	return response.EncodeToBase64(delay, err)
+}
+
+// PingBatch measures up to ten Xray configs in one temporary core instance.
+// Keeping the outbounds together avoids Xray-core's process-global dialer state
+// being replaced by concurrently-created temporary instances.
+func PingBatch(base64Text string) string {
+	var response nodep.CallResponse[[]pingBatchItemResponse]
+	req, err := base64.StdEncoding.DecodeString(base64Text)
+	if err != nil {
+		return response.EncodeToBase64(nil, err)
+	}
+	var request pingBatchRequest
+	if err := json.Unmarshal(req, &request); err != nil {
+		return response.EncodeToBase64(nil, err)
+	}
+
+	items := make([]xray.PingBatchItem, len(request.Configs))
+	for index, config := range request.Configs {
+		items[index] = xray.PingBatchItem{
+			XrayJSON:    config.XrayJSON,
+			OutboundTag: config.OutboundTag,
+		}
+	}
+	results, err := xray.PingBatch(items, request.Timeout, request.URL)
+	if err != nil {
+		return response.EncodeToBase64(nil, err)
+	}
+
+	encodedResults := make([]pingBatchItemResponse, len(results))
+	for index, result := range results {
+		encodedResults[index] = pingBatchItemResponse{
+			Success: result.Success,
+			Delay:   result.Delay,
+			Error:   result.Error,
+		}
+	}
+	return response.EncodeToBase64(encodedResults, nil)
 }
 
 // query inbound and outbound stats.
