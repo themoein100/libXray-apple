@@ -2,6 +2,7 @@ package share
 
 import (
 	"encoding/json"
+	"strconv"
 
 	"github.com/xtls/xray-core/infra/conf"
 )
@@ -9,33 +10,14 @@ import (
 // buildHy2FinalMask builds Hysteria2 QUIC hop / bandwidth / salamander mask (shared by URI and Clash).
 func buildHy2FinalMask(up, down, ports string, hopInterval *int32, obfsType, obfsPassword string) (*conf.FinalMask, error) {
 	var quicParams *conf.QuicParamsConfig
-	if up != "" || down != "" || ports != "" {
+	if up != "" || down != "" {
 		quicParams = &conf.QuicParamsConfig{}
-		if up != "" || down != "" {
-			quicParams.Congestion = "brutal"
-		}
+		quicParams.Congestion = "brutal"
 		if up != "" {
 			quicParams.BrutalUp = conf.Bandwidth(up)
 		}
 		if down != "" {
 			quicParams.BrutalDown = conf.Bandwidth(down)
-		}
-		if ports != "" {
-			udpHop := conf.UdpHop{}
-			portListJSON, err := json.Marshal(ports)
-			if err != nil {
-				return nil, err
-			}
-			// Since v26 UdpHop.PortList is a parsed conf.PortList rather than raw
-			// JSON, so hand the quoted port spec to its own unmarshaller.
-			if err := json.Unmarshal(portListJSON, &udpHop.PortList); err != nil {
-				return nil, err
-			}
-			if hopInterval != nil {
-				i := *hopInterval
-				udpHop.Interval = conf.Int32Range{Left: i, Right: i, From: i, To: i}
-			}
-			quicParams.UdpHop = udpHop
 		}
 	}
 
@@ -48,11 +30,51 @@ func buildHy2FinalMask(up, down, ports string, hopInterval *int32, obfsType, obf
 			return nil, err
 		}
 		obfs.Settings = &salamanderRawMessage
-		udpMasks = []conf.Mask{obfs}
+		udpMasks = append(udpMasks, obfs)
+	}
+
+	// Port hopping is a UDP mask since Xray-core v26.9.9 rather than a QUIC
+	// parameter. It goes last: the core wraps the socket from the end of the
+	// list, and hopping has to sit under salamander, as it did before.
+	if ports != "" {
+		hop, err := buildUDPHopMask(ports, hopInterval)
+		if err != nil {
+			return nil, err
+		}
+		udpMasks = append(udpMasks, hop)
 	}
 
 	if quicParams == nil && len(udpMasks) == 0 {
 		return nil, nil
 	}
 	return &conf.FinalMask{QuicParams: quicParams, Udp: udpMasks}, nil
+}
+
+// defaultHopInterval is the Hysteria 2 default for `hop-interval`. The core
+// now rejects a hop mask without an interval (minimum 5 s), where it used to
+// fall back on its own.
+const defaultHopInterval int32 = 30
+
+func buildUDPHopMask(ports string, hopInterval *int32) (conf.Mask, error) {
+	interval := defaultHopInterval
+	if hopInterval != nil {
+		interval = *hopInterval
+	}
+	// Written as the JSON the core parses: conf.Int32Range and conf.PortList
+	// only unmarshal from their string forms, not from their own marshalling.
+	settings := map[string]string{
+		"mode":        "intervalRemote",
+		"remotePorts": ports,
+		"interval":    strconv.FormatInt(int64(interval), 10),
+	}
+	raw, err := convertJsonToRawMessage(settings)
+	if err != nil {
+		return conf.Mask{}, err
+	}
+	// Reject a malformed port spec here rather than when the core starts.
+	var hop conf.UDPHop
+	if err := json.Unmarshal(raw, &hop); err != nil {
+		return conf.Mask{}, err
+	}
+	return conf.Mask{Type: "udphop", Settings: &raw}, nil
 }

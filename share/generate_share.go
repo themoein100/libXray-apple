@@ -236,7 +236,7 @@ func streamSettingsQuery(proxy conf.OutboundDetourConfig, link *url.URL) {
 			}
 		}
 
-		// QuicParams (bandwidth + port-hopping)
+		// QuicParams (bandwidth)
 		if streamSettings.FinalMask != nil && streamSettings.FinalMask.QuicParams != nil {
 			qp := streamSettings.FinalMask.QuicParams
 			if len(qp.BrutalUp) > 0 {
@@ -245,25 +245,31 @@ func streamSettingsQuery(proxy conf.OutboundDetourConfig, link *url.URL) {
 			if len(qp.BrutalDown) > 0 {
 				query = addQuery(query, "down", string(qp.BrutalDown))
 			}
-			// Both fields are values (not pointers) since v26; an empty range and a
-			// zero interval stand in for what used to be nil.
-			if portList := qp.UdpHop.PortList.String(); len(portList) > 0 {
-				query = addQuery(query, "ports", portList)
-			}
-			if qp.UdpHop.Interval.From != 0 {
-				query = addQuery(query, "hop-interval", strconv.FormatInt(int64(qp.UdpHop.Interval.From), 10))
-			}
 		}
 
-		// Salamander
-		if streamSettings.FinalMask != nil && len(streamSettings.FinalMask.Udp) > 0 {
-			mask := streamSettings.FinalMask.Udp[0]
-			if mask.Settings != nil {
-				var obfs *conf.Salamander
-				err := json.Unmarshal(*mask.Settings, &obfs)
-				if err == nil {
-					query = addQuery(query, "obfs", "salamander")
-					query = addQuery(query, "obfs-password", obfs.Password)
+		// UDP masks: salamander obfuscation and port hopping
+		if streamSettings.FinalMask != nil {
+			for _, mask := range streamSettings.FinalMask.Udp {
+				if mask.Settings == nil {
+					continue
+				}
+				switch mask.Type {
+				case "salamander":
+					var obfs conf.Salamander
+					if json.Unmarshal(*mask.Settings, &obfs) == nil {
+						query = addQuery(query, "obfs", "salamander")
+						query = addQuery(query, "obfs-password", obfs.Password)
+					}
+				case "udphop":
+					var hop conf.UDPHop
+					if json.Unmarshal(*mask.Settings, &hop) == nil {
+						if portList := hop.RemotePorts.String(); len(portList) > 0 {
+							query = addQuery(query, "ports", portList)
+						}
+						if hop.Interval.From != 0 {
+							query = addQuery(query, "hop-interval", strconv.FormatInt(int64(hop.Interval.From), 10))
+						}
+					}
 				}
 			}
 		}

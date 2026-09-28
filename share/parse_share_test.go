@@ -99,16 +99,16 @@ func TestHysteria2_WithEverything(t *testing.T) {
 	assert.Equal(t, conf.Bandwidth("50 mbps"), qp.BrutalUp)
 	assert.Equal(t, conf.Bandwidth("100 mbps"), qp.BrutalDown)
 
-	// UdpHop
-	var portList string
-	require.NoError(t, json.Unmarshal(qp.UdpHop.PortList, &portList))
-	assert.Equal(t, "20000-40000", portList)
-	require.NotNil(t, qp.UdpHop.Interval)
-	assert.Equal(t, int32(30), qp.UdpHop.Interval.From)
-	assert.Equal(t, int32(30), qp.UdpHop.Interval.To)
+	// Port hopping is the last UDP mask, under salamander
+	hop := udpHopMask(t, ss.FinalMask)
+	require.NotNil(t, hop)
+	assert.Equal(t, "intervalRemote", hop.Mode)
+	assert.Equal(t, "20000-40000", hop.RemotePorts.String())
+	assert.Equal(t, int32(30), hop.Interval.From)
+	assert.Equal(t, int32(30), hop.Interval.To)
 
 	// Salamander
-	require.Len(t, ss.FinalMask.Udp, 1)
+	require.Len(t, ss.FinalMask.Udp, 2)
 	assert.Equal(t, "salamander", ss.FinalMask.Udp[0].Type)
 }
 
@@ -131,21 +131,27 @@ func TestHysteria2_PortsOnlyNoCongestion(t *testing.T) {
 	ss := outbound.StreamSetting
 	require.NotNil(t, ss)
 	require.NotNil(t, ss.FinalMask)
-	require.NotNil(t, ss.FinalMask.QuicParams)
+	// Without bandwidth there are no QUIC params, so no Congestion either
+	assert.Nil(t, ss.FinalMask.QuicParams)
 
-	qp := ss.FinalMask.QuicParams
-	// No Congestion when only ports are set (no bandwidth)
-	assert.Empty(t, qp.Congestion)
-	assert.Empty(t, string(qp.BrutalUp))
-	assert.Empty(t, string(qp.BrutalDown))
+	// Port hopping is the last UDP mask, under salamander
+	hop := udpHopMask(t, ss.FinalMask)
+	require.NotNil(t, hop)
+	assert.Equal(t, "intervalRemote", hop.Mode)
+	assert.Equal(t, "20000-40000", hop.RemotePorts.String())
+	assert.Equal(t, int32(10), hop.Interval.From)
+	assert.Equal(t, int32(10), hop.Interval.To)
+}
 
-	// UdpHop is set
-	var portList string
-	require.NoError(t, json.Unmarshal(qp.UdpHop.PortList, &portList))
-	assert.Equal(t, "20000-40000", portList)
-	require.NotNil(t, qp.UdpHop.Interval)
-	assert.Equal(t, int32(10), qp.UdpHop.Interval.From)
-	assert.Equal(t, int32(10), qp.UdpHop.Interval.To)
+func TestHysteria2_PortsDefaultHopInterval(t *testing.T) {
+	outbound := parseHy2Link(t, "hy2://auth@host:443?ports=20000-40000&sni=example.com")
+
+	hop := udpHopMask(t, outbound.StreamSetting.FinalMask)
+	require.NotNil(t, hop)
+	assert.Equal(t, int32(30), hop.Interval.From)
+	// The core rejects a hop mask without an interval, so the default must build.
+	_, err := outbound.StreamSetting.Build()
+	require.NoError(t, err)
 }
 
 func TestHysteria2_TLSDefaultWhenSecurityOmitted(t *testing.T) {

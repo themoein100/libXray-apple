@@ -67,16 +67,17 @@ func TestClashHysteria2_WithBandwidthPortHoppingSalamander(t *testing.T) {
 	assert.Equal(t, conf.Bandwidth("100 mbps"), qp.BrutalUp)
 	assert.Equal(t, conf.Bandwidth("200 mbps"), qp.BrutalDown)
 
-	// UdpHop
-	var portList string
-	require.NoError(t, json.Unmarshal(qp.UdpHop.PortList, &portList))
-	assert.Equal(t, "20000-40000", portList)
-	require.NotNil(t, qp.UdpHop.Interval)
-	assert.Equal(t, int32(30), qp.UdpHop.Interval.From)
-	assert.Equal(t, int32(30), qp.UdpHop.Interval.To)
+	// Port hopping is the last UDP mask, under salamander
+	hop := udpHopMask(t, ss.FinalMask)
+	require.NotNil(t, hop)
+	assert.Equal(t, "intervalRemote", hop.Mode)
+	assert.Equal(t, "20000-40000", hop.RemotePorts.String())
+	assert.Equal(t, int32(30), hop.Interval.From)
+	assert.Equal(t, int32(30), hop.Interval.To)
 
 	// Salamander
-	require.Len(t, ss.FinalMask.Udp, 1)
+	require.Len(t, ss.FinalMask.Udp, 2)
+	assert.Equal(t, "udphop", ss.FinalMask.Udp[1].Type)
 	assert.Equal(t, "salamander", ss.FinalMask.Udp[0].Type)
 	var salamander conf.Salamander
 	require.NoError(t, json.Unmarshal(*ss.FinalMask.Udp[0].Settings, &salamander))
@@ -112,8 +113,8 @@ func TestClashHysteria2_BandwidthOnly(t *testing.T) {
 	// No Salamander
 	assert.Empty(t, ss.FinalMask.Udp)
 
-	// No UdpHop
-	assert.Nil(t, qp.UdpHop.PortList)
+	// No port hopping
+	assert.Nil(t, udpHopMask(t, ss.FinalMask))
 }
 
 func TestClashHysteria2_SalamanderOnly(t *testing.T) {
@@ -179,7 +180,8 @@ func TestClashShadowsocks_Plain(t *testing.T) {
 	require.NoError(t, json.Unmarshal(*ob.Settings, &s))
 	assert.Equal(t, "aes-128-gcm", s.Cipher)
 	assert.Equal(t, "secret", s.Password)
-	assert.True(t, s.UoT)
+	// udp-over-tcp is accepted but dropped: the core no longer has UoT.
+	assert.NotContains(t, string(*ob.Settings), "uot")
 	assert.Nil(t, ob.StreamSetting)
 }
 
@@ -377,4 +379,17 @@ func TestClashVless_Reality(t *testing.T) {
 	assert.Equal(t, "reality", ss.Security)
 	require.NotNil(t, ss.REALITYSettings)
 	assert.Equal(t, "XYAbCdEfGhIjKlMnOpQrStUvWxYz0123456789AB", ss.REALITYSettings.PublicKey)
+}
+
+// udpHopMask returns the decoded udphop mask from a FinalMask, or nil.
+func udpHopMask(t *testing.T, fm *conf.FinalMask) *conf.UDPHop {
+	t.Helper()
+	for _, m := range fm.Udp {
+		if m.Type == "udphop" {
+			var hop conf.UDPHop
+			require.NoError(t, json.Unmarshal(*m.Settings, &hop))
+			return &hop
+		}
+	}
+	return nil
 }
